@@ -1,136 +1,148 @@
 import pandas as pd
 import csv
-import matplotlib.pyplot as plt
 from datetime import datetime
-from data_entry import get_amount,get_date,get_description,get_category
+from data_entry import get_amount, get_category, get_date, get_description
+import matplotlib.pyplot as plt
 
 
 class CSV:
-    CSV_FILE="finance_data.csv"
-    columns=["date","amount","category","description"]
-    format ="%d-%m-%Y"
+    CSV_FILE = "finance_data.csv"
+    COLUMNS = ["date", "amount", "category", "description"]
+    FORMAT = "%d-%m-%Y"
+
     @classmethod
     def initialize_csv(cls):
         try:
             pd.read_csv(cls.CSV_FILE)
         except FileNotFoundError:
-            df=pd.DataFrame(cls.columns)
-            df.to_csv(cls.CSV_FILE,index=False)
+            df = pd.DataFrame(columns=cls.COLUMNS)
+            df.to_csv(cls.CSV_FILE, index=False)
 
     @classmethod
-    def add_entry(cls,date,amount,category,description):
-        new_entry={
-            "date":date,
-            "amount":amount,
-            "category":category,
-            "description":description
-            
-            
-            }
-        with open(cls.CSV_FILE,"a",newline="") as csvfile:
-            writer=csv.DictWriter(csvfile,fieldnames=cls.columns)
+    def add_entry(cls, date, amount, category, description):
+        new_entry = {
+            "date": date,
+            "amount": amount,
+            "category": category,
+            "description": description,
+        }
+        with open(cls.CSV_FILE, "a", newline="") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=cls.COLUMNS)
             writer.writerow(new_entry)
-        print("entry added succesfully")   
+        print("Entry added successfully")
+
     @classmethod
-    def get_transactions(cls,start_date,end_date):
-        df=pd.read_csv(cls.CSV_FILE)
-        df["date"]=pd.to_datetime(df["date"],format=CSV.format)
-        start_date=datetime.strptime(start_date,CSV.format)
-        end_date=datetime.strptime(end_date,CSV.format)
-        
-    
-        mask=(df["date"]>=start_date)& (df["date"]<=end_date)
-    
-        filtered_df=df.loc[mask]
-        
+    def get_transactions(cls, start_date, end_date):
+        df = pd.read_csv(cls.CSV_FILE)
+
+        df["date"] = pd.to_datetime(df["date"], format=CSV.FORMAT)
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+
+        start_date = datetime.strptime(start_date, CSV.FORMAT)
+        end_date = datetime.strptime(end_date, CSV.FORMAT)
+
+        mask = (df["date"] >= start_date) & (df["date"] <= end_date)
+        filtered_df = df.loc[mask]
+
         if filtered_df.empty:
-            print("no transaction found on given date range")
+            print("No transactions found in the given date range.")
         else:
-            print(f"transactions from{start_date.strftime(CSV.format)} to {end_date.strftime(CSV.format)}")
-            print(filtered_df.to_string(index=False,formatters={"date":lambda x: x.strftime(CSV.format)}))
-            
-            total_income=filtered_df[filtered_df["category"]== "income"]["amount"].sum()
-            total_expenses=filtered_df[filtered_df["category"]== "expense"]["amount"].sum()
-            
-            print("\n Summary:")
-            print(f"total income: ${total_income:.2f}")
-            print(f" toal expenes : ${total_expenses: .2f}")
-            print(f"net savings: ${(total_income-total_expenses):.2f} ")
-            
-            return filtered_df
-            
-            
+            print(
+                f"Transactions from {start_date.strftime(CSV.FORMAT)} to {end_date.strftime(CSV.FORMAT)}"
+            )
+            print(
+                filtered_df.to_string(
+                    index=False,
+                    formatters={"date": lambda x: x.strftime(CSV.FORMAT)},
+                )
+            )
+
+            total_income = filtered_df[filtered_df["category"] == "Income"]["amount"].sum()
+            total_expense = filtered_df[filtered_df["category"] == "Expense"]["amount"].sum()
+
+            print("\nSummary:")
+            print(f"Total Income: ${total_income:.2f}")
+            print(f"Total Expense: ${total_expense:.2f}")
+            print(f"Net Savings: ${(total_income - total_expense):.2f}")
+
+        return filtered_df
+
+
 def add():
     CSV.initialize_csv()
-    date=get_date("enter the date of transaction (dd-mm-yyyy) or neter for today's date: ",allow_default=True)
-    amount=get_amount()
-    category=get_category()
-    description=get_description()
-    CSV.add_entry(date,amount,category,description)
-    
-    
-    
-    
-    
-    
-    
-def plot_transactions(df):
-    # Convert date column
-    df["date"] = pd.to_datetime(df["date"])
+    date = get_date(
+        "Enter the date (dd-mm-yyyy) or press enter for today: ",
+        allow_default=True,
+    )
+    amount = get_amount()
+    category = get_category()
+    description = get_description()  
+    CSV.add_entry(date, amount, category, description)
 
-    # Set index
+
+def plot_transactions(df):
+    
+    df["date"] = pd.to_datetime(df["date"], format="%d-%m-%Y")
+    df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+
     df.set_index("date", inplace=True)
 
-    # Normalize category (important)
-    df["category"] = df["category"].str.lower()
+   
+    date_range = pd.date_range(start=df.index.min(), end=df.index.max())
 
-    # Work only with numeric column
-    income_df = df[df["category"] == "income"]["amount"].resample("D").sum()
-    expense_df = df[df["category"] == "expense"]["amount"].resample("D").sum()
+    income_df = (
+        df[df["category"] == "Income"]
+        .resample("D")["amount"]
+        .sum()
+        .reindex(date_range, fill_value=0)
+    )
 
-    
-    income_df = income_df.fillna(0)
-    expense_df = expense_df.fillna(0)# Fill missing values
+    expense_df = (
+        df[df["category"] == "Expense"]
+        .resample("D")["amount"]
+        .sum()
+        .reindex(date_range, fill_value=0)
+    )
 
-    # Plot
     plt.figure(figsize=(10, 5))
-
-    plt.plot(income_df.index, income_df, label="Income")
-    plt.plot(expense_df.index, expense_df, label="Expense")
-
+    plt.plot(income_df.index, income_df, label="Income", color="g")
+    plt.plot(expense_df.index, expense_df, label="Expense", color="r")
     plt.xlabel("Date")
     plt.ylabel("Amount")
     plt.title("Income and Expenses Over Time")
     plt.legend()
     plt.grid(True)
-
     plt.show()
-
-    
-    
 
 
 def main():
     while True:
-        print("\n 1. Add a new transaction")
-        print("\n2. view transactions and summary within a date range")
-        print("\n 3. Exit")
-        choice=int(input("chosse your choice (1-3)"))
-        
-        
-        if choice==1:
+        print("\n1. Add a new transaction")
+        print("2. View transactions and summary within a date range")
+        print("3. Exit")
+
+        choice = input("Enter your choice (1-3): ")
+
+        if choice == "1":
             add()
-        elif choice==2:
-            start_date=get_date("enter the start date (dd-mm-yyyy) ")
-            end_date=get_date("enter the end date (dd-mm-yyyy) ")
-            df=CSV.get_transactions(start_date,end_date)
-            if input("Do you want to see plot ? (y/n)").lower()=="y":
-                plot_transactions(df)
-        elif choice==3:
-            print("Exiting.....")
+
+        elif choice == "2":
+            start_date = get_date("Enter start date (dd-mm-yyyy): ")
+            end_date = get_date("Enter end date (dd-mm-yyyy): ")
+
+            df = CSV.get_transactions(start_date, end_date)
+
+            if not df.empty:
+                if input("Do you want to see a plot? (y/n): ").lower() == "y":
+                    plot_transactions(df)
+
+        elif choice == "3":
+            print("Exiting...")
             break
+
         else:
-            print("invalid choice Enter 1,2 or 3")
-if __name__=="__main__":
+            print("Invalid choice. Enter 1, 2 or 3.")
+
+
+if __name__ == "__main__":
     main()
-    

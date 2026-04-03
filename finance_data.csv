@@ -13,4 +13,6 @@ date,amount,category,description
 07-04-2026,100,expense,transport
 08-04-2026,600,expense,grocery
 08-04-2026,8000,income,salary
-09-04-2026,450,expense,utilities03-04-2026,9000.0,income,
+09-04-2026,450,expense,x
+03-04-2026,2000.0,Income,
+03-04-2026,900.0,Expense,
